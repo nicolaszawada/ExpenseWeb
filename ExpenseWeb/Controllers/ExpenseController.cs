@@ -18,56 +18,74 @@ namespace ExpenseWeb.Controllers
         {
             _expenses = new List<Expense>()
             {
-                new Expense("Colruyt", 5),
-                new Expense("Kapper", 10),
-                new Expense("Test", 4),
-                new Expense("Resto", 55),
-                new Expense("Café", 105, new DateTime(2020,1,1)),
-                new Expense("Pita", 10, new DateTime(2020,1,1)),
-                new Expense("Fruit", 8, new DateTime(2020,2,1)),
+                new Expense("Colruyt", 5, "Winkel"),
+                new Expense("Kapper", 10, "Beauty"),
+                new Expense("Test", 4, "Test"),
+                new Expense("Resto", 55, "Genieten"),
+                new Expense("Café", 105, new DateTime(2020,1,1), "Genieten"),
+                new Expense("Pita", 10, new DateTime(2020,1,1), "Eten"),
+                new Expense("Fruit", 8, new DateTime(2020,2,1), "Eten"),
             };
         }
 
         public IActionResult Index()
         {
-            var ordered = _expenses.OrderBy(x => x.Amount);
+            var vm = new ExpenseStatisticsViewModel();
 
-            var max = ordered.Last();
-            var least = ordered.First();
-
-
-            ExpenseStatisticsViewModel vm = new ExpenseStatisticsViewModel();
-
-            vm.MostExpensive = new ExpenseDetailViewModel()
-            {
-                Amount = max.Amount,
-                Date = max.Date,
-                Description = max.Description
-            };
+            // Most & least expensive expense
+            var leastExpensive = _expenses.OrderBy(x => x.Amount).First();
+            var mostExpensive = _expenses.OrderBy(x => x.Amount).Last();
 
             vm.LeastExpensive = new ExpenseDetailViewModel()
             {
-                Amount = least.Amount,
-                Date = least.Date,
-                Description = least.Description
+                Amount = leastExpensive.Amount,
+                Date = leastExpensive.Date,
+                Description = leastExpensive.Description
             };
 
-            var groupedExpensesPerDay = _expenses.GroupBy(x => x.Date.Date);
-
-            var sumPerDay = new Dictionary<DateTime, decimal>();
-            foreach(var group in groupedExpensesPerDay)
+            vm.MostExpensive = new ExpenseDetailViewModel()
             {
-                var sumFromGroup = group.ToList().Sum(x => x.Amount);
+                Amount = mostExpensive.Amount,
+                Description = mostExpensive.Description,
+                Date = mostExpensive.Date
+            };
+
+            // Most expensive DAY
+            var groupedExpensesPerDay = _expenses.GroupBy(x => x.Date.Date);
+            var sumPerDay = new Dictionary<DateTime, decimal>();
+            foreach (var group in groupedExpensesPerDay)
+            {
+                var sumFromGroup = group.ToList().Sum(expense => expense.Amount);
                 sumPerDay.Add(group.Key, sumFromGroup);
             }
 
             var mostExpensiveDay = sumPerDay.OrderByDescending(x => x.Value).First();
+            vm.MostExpensiveDay = (mostExpensiveDay.Key, mostExpensiveDay.Value);
 
-            vm.DateMostExpensiveDay = mostExpensiveDay.Key;
-            vm.SumMostExpensiveDay = mostExpensiveDay.Value;
+            // Expenses per month
+            var groupedExpensesPerMonth = _expenses.GroupBy(expense => new { expense.Date.Month, expense.Date.Year });
+            var sumPerMonth = new Dictionary<string, decimal>();
+            foreach(var group in groupedExpensesPerMonth)
+            {
+                var sumFromMonth = group.ToList().Sum(x => x.Amount);
+                sumPerMonth.Add($"{group.Key.Month}/{group.Key.Year}", sumFromMonth);
+            }
+            vm.SumPerMonth = sumPerMonth;
 
+            // Most & least expensive category
+            var groupedCategories = _expenses.GroupBy(expense => expense.Category);
+            var sumPerCategory = new Dictionary<string, decimal>();
+            foreach(var group in groupedCategories)
+            {
+                var sumPerGroupedCategory = group.ToList().Sum(x => x.Amount);
+                sumPerCategory.Add(group.Key, sumPerGroupedCategory);
+            }
 
-            var groupedExpensesPerMonth = _expenses.GroupBy(x => new { x.Date.Month, x.Date.Year });
+            var mostExpensiveCat = sumPerCategory.OrderBy(x => x.Value).Last();
+            var leastExpensiveCat = sumPerCategory.OrderBy(x => x.Value).First();
+
+            vm.LeastExpensiveCategory = (leastExpensiveCat.Key, leastExpensiveCat.Value);
+            vm.MostExpensiveCategory = (mostExpensiveCat.Key, mostExpensiveCat.Value);
 
             return View();
         }
